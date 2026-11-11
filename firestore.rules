@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Catch-all deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidApiToken(data) {
+      return data.token is string && data.token.size() <= 128 &&
+             data.userId == request.auth.uid &&
+             data.requestCount is int && data.requestCount >= 0 &&
+             data.dailyLimit is int && data.dailyLimit > 0 &&
+             data.lastResetDate is string &&
+             data.createdAt == request.time;
+    }
+
+    match /api_tokens/{tokenId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(tokenId) && isValidApiToken(request.resource.data);
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // Update is handled by the server for rate limiting, but user can update their own metadata if needed
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid &&
+                    request.resource.data.userId == resource.data.userId &&
+                    request.resource.data.token == resource.data.token;
+    }
+  }
+}

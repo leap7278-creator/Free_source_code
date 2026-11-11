@@ -1,0 +1,24 @@
+{
+  "entities": {
+    "ApiToken": {
+      "title": "API Token",
+      "description": "Stores API tokens for public access with daily limits.",
+      "type": "object",
+      "properties": {
+        "token": { "type": "string", "description": "The unique API token." },
+        "userId": { "type": "string", "description": "Owner of the token." },
+        "requestCount": { "type": "integer", "description": "Current number of requests used today." },
+        "dailyLimit": { "type": "integer", "description": "Maximum requests allowed per day." },
+        "lastResetDate": { "type": "string", "description": "ISO date string when the count was last reset (midnight)." },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["token", "userId", "requestCount", "dailyLimit", "lastResetDate", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/api_tokens/{tokenId}": {
+      "schema": "ApiToken",
+      "description": "Collection of API tokens."
+    }
+  }
+}
