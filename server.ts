@@ -4,38 +4,54 @@ import cors from 'cors';
 import morgan from 'morgan';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { initializeApp, cert } from 'firebase-admin/app';
+import { initializeApp, cert, getApps, getApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import fs from 'fs';
 import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
 import axiosRetry from 'axios-retry';
 import { HttpsProxyAgent } from 'https-proxy-agent';
+import { v4 as uuidv4 } from 'uuid';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Initialize Firebase Admin
+// Load local config for database ID and project metadata
 const configPath = path.resolve(__dirname, 'firebase-applet-config.json');
 let firebaseConfig: any = {};
 if (fs.existsSync(configPath)) {
-  firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  try {
+    firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  } catch (e) {
+    console.error('Failed to parse firebase-applet-config.json', e);
+  }
 }
 
-if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-  initializeApp({
-    credential: cert(serviceAccount),
-    projectId: firebaseConfig.projectId || serviceAccount.project_id,
-  });
-} else {
-  initializeApp({
-    projectId: firebaseConfig.projectId,
-  });
+// Initialize Firebase Admin with environment-aware config
+const serviceAccountVar = process.env.FIREBASE_SERVICE_ACCOUNT;
+
+if (getApps().length === 0) {
+  if (serviceAccountVar) {
+    const serviceAccount = JSON.parse(serviceAccountVar);
+    initializeApp({
+      credential: cert(serviceAccount),
+      projectId: serviceAccount.project_id || 'baser-id-game',
+    });
+  } else {
+    // In AI Studio, zero-config initializeApp() is the most reliable way to use provisioned credentials
+    initializeApp();
+  }
 }
 
-// Initialize Firestore with specific database ID if provided
-const db = getFirestore(process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || firebaseConfig.firestoreDatabaseId || undefined);
+const adminApp = getApp();
+const isVercelServer = !!process.env.VERCEL || !!serviceAccountVar;
+// In AI Studio, we must target the named database. On Vercel, we typically use (default).
+const databaseId = isVercelServer ? undefined : (firebaseConfig.firestoreDatabaseId || undefined);
+
+// Use the explicit databaseId if provided (required for named databases in AI Studio)
+const db = databaseId ? getFirestore(adminApp, databaseId) : getFirestore(adminApp);
+
+console.log(`Firestore initialized for project: ${adminApp.options.projectId || 'ambient'}, Database: ${databaseId || '(default)'}`);
 
 const app = express();
 
@@ -204,7 +220,15 @@ app.post('/api/tokens/generate', async (req, res) => {
   const { userId } = req.body;
   if (!userId) return res.status(400).send('User ID required');
   try {
-    const { v4: uuidv4 } = await import('uuid');
+    // Check existing tokens count (Limit to 2 for free tier)
+    const existingTokens = await db.collection('api_tokens').where('userId', '==', userId).get();
+    if (existingTokens.size >= 2) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Free tier limit reached: Maximum 2 API tokens allowed per user.' 
+      });
+    }
+
     const newToken = uuidv4();
     await db.collection('api_tokens').doc(newToken).set({
       token: newToken,
@@ -215,7 +239,11 @@ app.post('/api/tokens/generate', async (req, res) => {
       createdAt: FieldValue.serverTimestamp()
     });
     res.json({ success: true, token: newToken });
-  } catch (e) { res.status(500).send('Failed'); }
+  } catch (e: any) { 
+    console.error('Generate token error:', e);
+    const errorMsg = e.message || 'Unknown server error';
+    res.status(500).json({ success: false, message: `Failed to generate token: ${errorMsg}` }); 
+  }
 });
 
 app.get('/api/tokens/list', async (req, res) => {

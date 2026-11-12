@@ -134,8 +134,16 @@ const App = () => {
         body: JSON.stringify({ userId: user.uid }),
       });
       const data = await res.json();
-      if (data.success) fetchTokens(user.uid);
-    } catch (e) { console.error('Generate token error:', e); }
+      if (data.success) {
+        fetchTokens(user.uid);
+        setValidationError(null);
+      } else {
+        setValidationError(data.message || 'Failed to generate token');
+      }
+    } catch (e) { 
+      console.error('Generate token error:', e); 
+      setValidationError('Connection error. Could not generate token.');
+    }
     finally { setGenerating(false); }
   };
 
@@ -396,6 +404,13 @@ const App = () => {
                           {generating ? 'Generating...' : 'New API Token'}
                         </button>
 
+                        {validationError && (
+                          <div className="bg-rose-500/10 border border-rose-500/20 p-3 rounded-xl flex items-center gap-2 text-[10px] text-rose-400 font-bold">
+                            <ShieldAlert className="w-3.5 h-3.5" />
+                            {validationError}
+                          </div>
+                        )}
+
                         <div className="space-y-3">
                           {tokens.length === 0 ? (
                             <p className="text-center text-xs text-slate-600 py-4 italic">No tokens found.</p>
@@ -413,11 +428,17 @@ const App = () => {
                                 <div className="space-y-1.5">
                                   <div className="flex items-center justify-between text-[10px] text-slate-500">
                                     <span>Daily Requests</span>
-                                    <span className="text-slate-300">{(t.requestCount / t.dailyLimit * 100).toFixed(2)}%</span>
+                                    <span className={`${(t.requestCount / t.dailyLimit) >= 0.8 ? 'text-amber-400 font-bold' : 'text-slate-300'}`}>
+                                      {(t.requestCount / t.dailyLimit * 100).toFixed(2)}%
+                                    </span>
                                   </div>
                                   <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
                                     <div 
-                                      className="h-full bg-indigo-500 transition-all duration-1000" 
+                                      className={`h-full transition-all duration-1000 ${
+                                        (t.requestCount / t.dailyLimit) >= 0.9 ? 'bg-rose-500' :
+                                        (t.requestCount / t.dailyLimit) >= 0.8 ? 'bg-amber-500 shadow-[0_0_8px_#f59e0b]' : 
+                                        'bg-indigo-500'
+                                      }`}
                                       style={{ width: `${(t.requestCount / t.dailyLimit) * 100}%` }}
                                     />
                                   </div>
@@ -425,6 +446,11 @@ const App = () => {
                                     <span>{t.requestCount.toLocaleString()} used</span>
                                     <span>1M limit</span>
                                   </div>
+                                  {(t.requestCount / t.dailyLimit) >= 0.8 && (
+                                    <p className="text-[9px] text-amber-500/80 font-medium animate-pulse mt-1">
+                                      Warning: Token approaching daily limit.
+                                    </p>
+                                  )}
                                 </div>
                               </div>
                             ))
