@@ -29,12 +29,13 @@ service cloud.firestore {
 
     match /api_tokens/{tokenId} {
       allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && isValidId(tokenId) && isValidApiToken(request.resource.data);
+      allow create: if isSignedIn() && 
+                    isValidId(tokenId) && 
+                    tokenId == request.resource.data.token &&
+                    isValidApiToken(request.resource.data);
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
-      // Update is handled by the server for rate limiting, but user can update their own metadata if needed
-      allow update: if isSignedIn() && resource.data.userId == request.auth.uid &&
-                    request.resource.data.userId == resource.data.userId &&
-                    request.resource.data.token == resource.data.token;
+      // Update is forbidden for clients (server-only updates for request counts)
+      allow update: if false;
     }
   }
 }

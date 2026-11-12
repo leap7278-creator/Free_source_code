@@ -1,6 +1,6 @@
 {
-  "name": "Game ID Checker",
-  "description": "Verify player nicknames for Mobile Legends, Free Fire, and Blood Strike.",
+  "name": "GameID.PRO - Cambodia",
+  "description": "Enterprise-grade game ID verification and Developer API for MLBB, Free Fire, and Blood Strike.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
