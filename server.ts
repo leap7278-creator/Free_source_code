@@ -34,19 +34,38 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   });
 }
 
-const db = getFirestore(); // Admin SDK should have full access without rules constraints
+// Initialize Firestore with specific database ID if provided
+const db = getFirestore(process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || firebaseConfig.firestoreDatabaseId || undefined);
+
 const app = express();
+
+// List of User Agents for randomization
+const USER_AGENTS = [
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0',
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_3_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1'
+];
 
 // Configure Axios with retry and optional proxy
 const axiosInstance = axios.create();
-axiosRetry(axiosInstance, { retries: 3, retryDelay: axiosRetry.exponentialDelay });
+axiosRetry(axiosInstance, { 
+  retries: 3, 
+  retryDelay: axiosRetry.exponentialDelay,
+  retryCondition: (error) => {
+    return axiosRetry.isNetworkOrIdempotentRequestError(error) || error.response?.status === 429;
+  }
+});
 
 const PROXY_URL = process.env.PROXY_URL;
 if (PROXY_URL) {
   const agent = new HttpsProxyAgent(PROXY_URL);
   axiosInstance.defaults.httpsAgent = agent;
   axiosInstance.defaults.proxy = false;
-  console.log('Using Proxy for checker:', PROXY_URL);
+  console.log('Using Proxy for SMILE checker:', PROXY_URL);
+} else {
+  console.warn('WARNING: No PROXY_URL set. SMILE check may be rate limited by IP.');
 }
 
 // Enable 'trust proxy' for rate limiting
@@ -62,7 +81,7 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('combined'));
 
-// Rate Limiting
+// Rate Limiting (Internal API Protection)
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -101,15 +120,24 @@ const checkAccount = async (game: string, userId: string, zoneId?: string) => {
   params.append('pid', target.pid);
   params.append('checkrole', '1');
 
+  const randomUA = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+
   try {
     const response = await axiosInstance.post(`${SMILE_BASE_URL}${target.path}`, params, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Referer': `${SMILE_BASE_URL}/${target.referer}`,
         'X-Requested-With': 'XMLHttpRequest',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'User-Agent': randomUA,
         'Accept': 'application/json, text/javascript, */*; q=0.01',
-        'Origin': 'https://www.smile.one'
+        'Origin': 'https://www.smile.one',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Sec-Ch-Ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+        'Sec-Ch-Ua-Mobile': '?0',
+        'Sec-Ch-Ua-Platform': '"Windows"',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'same-origin'
       },
       timeout: 15000
     });
@@ -119,7 +147,10 @@ const checkAccount = async (game: string, userId: string, zoneId?: string) => {
     }
     return { success: false, message: response.data.msg || 'Account not found' };
   } catch (error: any) {
-    return { success: false, message: 'Server busy' };
+    if (error.response?.status === 429) {
+      return { success: false, message: 'Provider rate limit hit. Try again later.' };
+    }
+    return { success: false, message: 'Server busy or blocked' };
   }
 };
 

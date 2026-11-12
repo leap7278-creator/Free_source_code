@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, ShieldCheck, ShieldAlert, Gamepad2, Info, Loader2, User as UserIcon, Hash, Key, Copy, CheckCircle2, LogIn, LogOut, Terminal, BarChart as ChartIcon } from 'lucide-react';
+import { Search, ShieldCheck, ShieldAlert, Gamepad2, Info, Loader2, User as UserIcon, Hash, Key, Copy, CheckCircle2, LogIn, LogOut, Terminal, BarChart as ChartIcon, Send } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged, User } from './firebase';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -817,15 +817,29 @@ const App = () => {
           )}
         </AnimatePresence>
 
-        <footer className="mt-20 text-center text-slate-500 text-sm border-t border-slate-900 pt-8">
+        <footer className="mt-20 text-center text-slate-500 text-sm border-t border-slate-900 pt-8 pb-12">
           <p className="font-medium text-[11px]">© 2026 GameID.PRO Cambodia. Developed for the Gaming Community.</p>
-          <div className="mt-4 flex items-center justify-center gap-6 text-[10px] font-bold uppercase tracking-widest opacity-60">
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-6 text-[10px] font-bold uppercase tracking-widest opacity-60">
             <span className="flex items-center gap-1.5 text-emerald-500"><ShieldCheck className="w-3 h-3" /> SSL Secure</span>
             <span className="flex items-center gap-1.5 text-indigo-500"><Terminal className="w-3 h-3" /> API Ready</span>
             <button onClick={() => setActiveView('developer')} className="flex items-center gap-1.5 text-purple-500 hover:text-purple-400 transition-colors">Developer Portal</button>
+            <a href="https://t.me/p_xorzz" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[#229ED9] hover:text-[#1e8dbf] transition-colors">
+              <Send className="w-3 h-3" /> Telegram
+            </a>
           </div>
         </footer>
       </div>
+
+      {/* Floating Telegram Button */}
+      <a 
+        href="https://t.me/p_xorzz" 
+        target="_blank" 
+        rel="noopener noreferrer"
+        className="fixed bottom-6 right-6 z-[60] w-12 h-12 bg-[#229ED9] hover:bg-[#1e8dbf] rounded-full flex items-center justify-center shadow-lg shadow-[#229ED9]/30 transition-all hover:scale-110 active:scale-95 group"
+        title="Contact Support"
+      >
+        <Send className="w-6 h-6 text-white -translate-x-0.5 translate-y-0.5" />
+      </a>
     </div>
   );
 };
