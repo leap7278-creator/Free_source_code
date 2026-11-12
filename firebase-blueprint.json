@@ -13,12 +13,26 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["token", "userId", "requestCount", "dailyLimit", "lastResetDate", "createdAt"]
+    },
+    "UsageHistory": {
+      "title": "Usage History",
+      "description": "Daily request counts for a specific token.",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "description": "ISO date string YYYY-MM-DD" },
+        "count": { "type": "integer" }
+      },
+      "required": ["date", "count"]
     }
   },
   "firestore": {
     "/api_tokens/{tokenId}": {
       "schema": "ApiToken",
       "description": "Collection of API tokens."
+    },
+    "/api_tokens/{tokenId}/history/{date}": {
+      "schema": "UsageHistory",
+      "description": "Daily usage records."
     }
   }
 }

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Search, ShieldCheck, ShieldAlert, Gamepad2, Info, Loader2, User as UserIcon, Hash, Key, Copy, CheckCircle2, LogIn, LogOut, Terminal } from 'lucide-react';
+import { Search, ShieldCheck, ShieldAlert, Gamepad2, Info, Loader2, User as UserIcon, Hash, Key, Copy, CheckCircle2, LogIn, LogOut, Terminal, BarChart as ChartIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged, User } from './firebase';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 type GameType = 'MLBB' | 'FREEFIRE' | 'BLOODSTRIKE';
 type ViewType = 'checker' | 'developer' | 'settings';
@@ -43,6 +44,7 @@ const App = () => {
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [apiStatus, setApiStatus] = useState<'online' | 'busy' | 'offline'>('online');
   const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
+  const [usageHistory, setUsageHistory] = useState<any[]>([]);
 
   useEffect(() => {
     const saved = localStorage.getItem('recentSearches');
@@ -76,12 +78,48 @@ const App = () => {
     return unsubscribe;
   }, []);
 
+  const fetchHistory = async (token: string) => {
+    try {
+      const res = await fetch(`/api/tokens/history?token=${encodeURIComponent(token)}`);
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Server returned ${res.status}: ${text}`);
+      }
+      const data = await res.json();
+      if (data.success && Array.isArray(data.history)) {
+        // Format for recharts: { name: 'MM-DD', requests: count }
+        const formatted = data.history.map((h: any) => {
+          const dateStr = String(h.date || '');
+          const parts = dateStr.split('-');
+          return {
+            name: parts.length > 2 ? `${parts[1]}/${parts[2]}` : dateStr,
+            requests: Number(h.count || 0)
+          };
+        });
+        setUsageHistory(formatted);
+      }
+    } catch (e: any) { 
+      console.error('Fetch history error:', e.name, e.message); 
+    }
+  };
+
   const fetchTokens = async (uid: string) => {
     try {
-      const res = await fetch(`/api/tokens/list?userId=${uid}`);
+      const res = await fetch(`/api/tokens/list?userId=${encodeURIComponent(uid)}`);
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Server returned ${res.status}: ${text}`);
+      }
       const data = await res.json();
-      if (data.success) setTokens(data.tokens);
-    } catch (e) { console.error('Fetch tokens error:', e); }
+      if (data.success && Array.isArray(data.tokens)) {
+        setTokens(data.tokens);
+        if (data.tokens.length > 0 && data.tokens[0].token) {
+          fetchHistory(data.tokens[0].token);
+        }
+      }
+    } catch (e: any) { 
+      console.error('Fetch tokens error:', e.name, e.message); 
+    }
   };
 
   const handleGenerateToken = async () => {
@@ -261,6 +299,73 @@ const App = () => {
                 <h1 className="text-4xl font-bold text-white tracking-tight">Developer Portal</h1>
                 <p className="text-slate-400 mt-2">API Usage & Documentation</p>
               </header>
+
+              {/* Usage Chart Section */}
+              {user && usageHistory.length > 0 && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-slate-900/50 border border-slate-800 rounded-3xl p-6 md:p-8"
+                >
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 bg-indigo-600/10 rounded-xl flex items-center justify-center text-indigo-400">
+                      <ChartIcon className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-white leading-tight">Request Activity</h2>
+                      <p className="text-xs text-slate-500">Daily API requests over the last 7 days</p>
+                    </div>
+                  </div>
+                  
+                  <div className="h-[250px] w-full mt-4">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={usageHistory} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                        <XAxis 
+                          dataKey="name" 
+                          stroke="#475569" 
+                          fontSize={10} 
+                          tickLine={false} 
+                          axisLine={false} 
+                          dy={10}
+                        />
+                        <YAxis 
+                          stroke="#475569" 
+                          fontSize={10} 
+                          tickLine={false} 
+                          axisLine={false} 
+                          tickFormatter={(value) => value.toLocaleString()}
+                        />
+                        <Tooltip 
+                          cursor={{ fill: 'rgba(255,255,255,0.05)', radius: 8 }}
+                          contentStyle={{ 
+                            backgroundColor: '#0f172a', 
+                            border: '1px solid #1e293b', 
+                            borderRadius: '12px',
+                            fontSize: '12px',
+                            fontWeight: 'bold',
+                            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5)'
+                          }}
+                          itemStyle={{ color: '#818cf8' }}
+                        />
+                        <Bar 
+                          dataKey="requests" 
+                          fill="#4f46e5" 
+                          radius={[6, 6, 0, 0]} 
+                          barSize={32}
+                        >
+                          {usageHistory.map((entry, index) => (
+                            <Cell 
+                              key={`cell-${index}`} 
+                              fill={index === usageHistory.length - 1 ? '#818cf8' : '#4f46e5'} 
+                              fillOpacity={index === usageHistory.length - 1 ? 1 : 0.6}
+                            />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </motion.div>
+              )}
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Usage Panel */}

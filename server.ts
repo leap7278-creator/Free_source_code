@@ -139,7 +139,13 @@ const validateApiToken = async (req: Request, res: Response, next: any) => {
 
     if (currentCount >= tokenData.dailyLimit) return res.status(429).json({ success: false, message: 'Limit exceeded' });
 
+    // Non-blocking updates
     tokenDoc.ref.update({ requestCount: currentCount + 1, lastResetDate: todayStr }).catch(e => console.error(e));
+    tokenDoc.ref.collection('history').doc(todayStr).set({
+      date: todayStr,
+      count: FieldValue.increment(1)
+    }, { merge: true }).catch(e => console.error(e));
+
     next();
   } catch (error) { res.status(500).json({ success: false, message: 'Security error' }); }
 };
@@ -185,7 +191,18 @@ app.get('/api/tokens/list', async (req, res) => {
   const { userId } = req.query;
   try {
     const q = await db.collection('api_tokens').where('userId', '==', userId).get();
-    res.json({ success: true, tokens: q.docs.map(d => d.data()) });
+    res.json({ success: true, tokens: q.docs.map((d: any) => d.data()) });
+  } catch (e) { res.status(500).send('Error'); }
+});
+
+app.get('/api/tokens/history', async (req, res) => {
+  const { token } = req.query;
+  if (!token) return res.status(400).send('Token required');
+  try {
+    const q = await db.collection('api_tokens').where('token', '==', token).limit(1).get();
+    if (q.empty) return res.status(404).send('Not found');
+    const historyQ = await q.docs[0].ref.collection('history').orderBy('date', 'desc').limit(7).get();
+    res.json({ success: true, history: historyQ.docs.map((d: any) => d.data()).reverse() });
   } catch (e) { res.status(500).send('Error'); }
 });
 

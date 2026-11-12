@@ -36,6 +36,10 @@ service cloud.firestore {
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
       // Update is forbidden for clients (server-only updates for request counts)
       allow update: if false;
+
+      match /history/{date} {
+        allow read: if isSignedIn() && get(/databases/$(database)/documents/api_tokens/$(tokenId)).data.userId == request.auth.uid;
+      }
     }
   }
 }
