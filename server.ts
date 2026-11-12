@@ -84,6 +84,8 @@ async function startServer() {
     validate: { trustProxy: false },
   });
 
+  app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date() }));
+
   app.use('/api/', globalLimiter);
   app.use(['/ff/api', '/blood-strike/api', '/mobile/api'], apiLimiter);
 
@@ -252,8 +254,6 @@ async function startServer() {
     const result = await checkAccount('bloodstrike', userId);
     res.json(result);
   });
-
-  app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date() }));
   // Serve index.html for all non-API routes
   app.get('*', async (req, res, next) => {
     const url = req.originalUrl;
