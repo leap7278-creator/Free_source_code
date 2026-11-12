@@ -104,21 +104,23 @@ const App = () => {
   };
 
   const fetchTokens = async (uid: string) => {
+    if (!uid) return;
     try {
       const res = await fetch(`/api/tokens/list?userId=${encodeURIComponent(uid)}`);
       if (!res.ok) {
         const text = await res.text();
-        throw new Error(`Server returned ${res.status}: ${text}`);
+        throw new Error(`Server error: ${text}`);
       }
       const data = await res.json();
       if (data.success && Array.isArray(data.tokens)) {
         setTokens(data.tokens);
+        // Automatically fetch history for the first active token
         if (data.tokens.length > 0 && data.tokens[0].token) {
           fetchHistory(data.tokens[0].token);
         }
       }
     } catch (e: any) { 
-      console.error('Fetch tokens error:', e.name, e.message); 
+      console.error('Token fetch error:', e.message); 
     }
   };
 
@@ -473,6 +475,63 @@ const App = () => {
                       <p className="text-[11px] text-slate-500 mt-2">
                         You can pass the token as a query parameter <code className="text-indigo-400">?token=...</code> or as a header <code className="text-indigo-400">x-api-token</code>.
                       </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-6 md:p-8">
+                    <h2 className="text-xl font-bold mb-6 text-white flex items-center gap-2">
+                      <Info className="w-6 h-6 text-indigo-400" />
+                      Frequently Asked Questions
+                    </h2>
+                    
+                    <div className="space-y-8">
+                      {[
+                        {
+                          q: "How do I authenticate my requests?",
+                          a: "You can authenticate by sending your API token in the 'x-api-token' header or as a 'token' query parameter in the URL. Tokens can be generated in the API Usage panel."
+                        },
+                        {
+                          q: "What are the rate limits?",
+                          a: "Each token has a standard limit of 1,000,000 requests per 24-hour period. Usage counters reset automatically every day at 00:00 UTC."
+                        },
+                        {
+                          q: "What do the different error codes mean?",
+                          a: (
+                            <div className="space-y-3 mt-2">
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs font-mono text-emerald-400 w-8">200</span>
+                                <span className="text-xs text-slate-400">Success. The account was found and nickname returned.</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs font-mono text-rose-400 w-8">401</span>
+                                <span className="text-xs text-slate-400">Unauthorized. Your API token is invalid or missing.</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs font-mono text-amber-400 w-8">404</span>
+                                <span className="text-xs text-slate-400">Not Found. The Player ID or Zone ID is incorrect.</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs font-mono text-blue-400 w-8">429</span>
+                                <span className="text-xs text-slate-400">Rate Limited. You have exceeded your 1M daily limit.</span>
+                              </div>
+                            </div>
+                          )
+                        },
+                        {
+                          q: "Is there a limit on concurrent requests?",
+                          a: "Yes, we implement a safety burst limit of 60 requests per minute per IP to prevent system abuse and ensure fair resource distribution for all developers."
+                        }
+                      ].map((faq, i) => (
+                        <div key={i} className="group">
+                          <h4 className="font-bold text-slate-200 mb-2 flex items-center gap-2 group-hover:text-indigo-400 transition-colors">
+                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                            {faq.q}
+                          </h4>
+                          <div className="text-sm text-slate-400 leading-relaxed pl-3.5 border-l border-slate-800">
+                            {faq.a}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>

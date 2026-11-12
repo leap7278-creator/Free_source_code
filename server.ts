@@ -34,7 +34,7 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   });
 }
 
-const db = getFirestore();
+const db = getFirestore(); // Admin SDK should have full access without rules constraints
 const app = express();
 
 // Configure Axios with retry and optional proxy
@@ -192,7 +192,10 @@ app.get('/api/tokens/list', async (req, res) => {
   try {
     const q = await db.collection('api_tokens').where('userId', '==', userId).get();
     res.json({ success: true, tokens: q.docs.map((d: any) => d.data()) });
-  } catch (e) { res.status(500).send('Error'); }
+  } catch (e: any) { 
+    console.error('List Tokens Error:', e);
+    res.status(500).send(e.message || 'Internal Server Error'); 
+  }
 });
 
 app.get('/api/tokens/history', async (req, res) => {
@@ -203,7 +206,10 @@ app.get('/api/tokens/history', async (req, res) => {
     if (q.empty) return res.status(404).send('Not found');
     const historyQ = await q.docs[0].ref.collection('history').orderBy('date', 'desc').limit(7).get();
     res.json({ success: true, history: historyQ.docs.map((d: any) => d.data()).reverse() });
-  } catch (e) { res.status(500).send('Error'); }
+  } catch (e: any) { 
+    console.error('Fetch History Error:', e);
+    res.status(500).send(e.message || 'Internal Server Error'); 
+  }
 });
 
 app.post('/api/check/mlbb', async (req, res) => {
